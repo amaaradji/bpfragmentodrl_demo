@@ -48,25 +48,26 @@
                     <div class="card-header bg-light">
                         <h5 class="card-title mb-0">
                             <i class="fas fa-upload me-2"></i>
-                            Upload BPMN Model
+                            Upload BPMN Model and Configure Policy Generation
                         </h5>
                     </div>
                     <div class="card-body">
                         <form id="uploadForm" enctype="multipart/form-data">
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label for="bpmn_file" class="form-label">BPMN File</label>
+                            <!-- BPMN File Upload -->
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="bpmn_file" class="form-label">BPMN File *</label>
                                     <input type="file" class="form-control" id="bpmn_file" name="bpmn_file" accept=".bpmn,.xml" required>
                                     <div class="form-text">Upload a BPMN (.bpmn) or XML (.xml) file</div>
                                 </div>
-                                <div class="col-md-3 mb-3">
-                                    <label for="approach" class="form-label">Policy Generation Approach</label>
+                                <div class="col-md-3">
+                                    <label for="approach" class="form-label">Policy Generation Technique</label>
                                     <select class="form-select" id="approach" name="approach">
                                         <option value="template">Template-based</option>
                                         <option value="llm">LLM-based</option>
                                     </select>
                                 </div>
-                                <div class="col-md-3 mb-3">
+                                <div class="col-md-3">
                                     <label for="fragmentation_strategy" class="form-label">Fragmentation Strategy</label>
                                     <select class="form-select" id="fragmentation_strategy" name="fragmentation_strategy">
                                         <option value="activity">Activity-based</option>
@@ -75,11 +76,115 @@
                                     </select>
                                 </div>
                             </div>
+
+                            <!-- BP-Level Policy Section -->
+                            <div class="row mb-3">
+                                <div class="col-12">
+                                    <div class="card border-secondary">
+                                        <div class="card-header bg-light">
+                                            <h6 class="card-title mb-0">
+                                                <i class="fas fa-shield-alt me-2"></i>
+                                                Business Process Level Policy (Optional)
+                                            </h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="row">
+                                                <div class="col-md-4 mb-3">
+                                                    <label class="form-label">BP Policy Source</label>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="radio" name="bp_policy_source" id="bp_policy_none" value="none" checked>
+                                                        <label class="form-check-label" for="bp_policy_none">
+                                                            No BP-level policy
+                                                        </label>
+                                                    </div>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="radio" name="bp_policy_source" id="bp_policy_generate" value="generate">
+                                                        <label class="form-check-label" for="bp_policy_generate">
+                                                            Generate BP-level policy
+                                                        </label>
+                                                    </div>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="radio" name="bp_policy_source" id="bp_policy_upload" value="upload">
+                                                        <label class="form-check-label" for="bp_policy_upload">
+                                                            Upload existing BP policy
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-8">
+                                                    <!-- BP Policy Upload -->
+                                                    <div id="bp_policy_upload_section" style="display: none;">
+                                                        <label for="bp_policy_file" class="form-label">BP Policy File</label>
+                                                        <input type="file" class="form-control" id="bp_policy_file" name="bp_policy_file" accept=".json,.odrl">
+                                                        <div class="form-text">Upload a JSON or ODRL policy file</div>
+                                                    </div>
+                                                    
+                                                    <!-- BP Policy Generation Options -->
+                                                    <div id="bp_policy_generate_section" style="display: none;">
+                                                        <label for="bp_policy_template" class="form-label">BP Policy Template</label>
+                                                        <select class="form-select" id="bp_policy_template" name="bp_policy_template">
+                                                            <option value="standard">Standard Business Process Policy</option>
+                                                            <option value="financial">Financial Process Policy</option>
+                                                            <option value="healthcare">Healthcare Process Policy</option>
+                                                            <option value="manufacturing">Manufacturing Process Policy</option>
+                                                            <option value="custom">Custom Policy (LLM-generated)</option>
+                                                        </select>
+                                                        <div class="form-text">Select a template for BP-level policy generation</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Advanced Options -->
+                            <div class="row mb-3">
+                                <div class="col-12">
+                                    <div class="card border-info">
+                                        <div class="card-header bg-light">
+                                            <h6 class="card-title mb-0">
+                                                <i class="fas fa-cog me-2"></i>
+                                                Advanced Options
+                                            </h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="row">
+                                                <div class="col-md-4">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" id="enable_consistency_check" name="enable_consistency_check" checked>
+                                                        <label class="form-check-label" for="enable_consistency_check">
+                                                            Enable policy consistency checking
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" id="generate_metrics" name="generate_metrics" checked>
+                                                        <label class="form-check-label" for="generate_metrics">
+                                                            Generate policy metrics
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" id="export_odrl" name="export_odrl" checked>
+                                                        <label class="form-check-label" for="export_odrl">
+                                                            Export ODRL-compliant policies
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Submit Button -->
                             <div class="row">
                                 <div class="col-12">
                                     <button type="submit" class="btn btn-primary btn-lg">
                                         <i class="fas fa-play me-2"></i>
-                                        Process BPMN Model
+                                        Process BPMN Model and Generate Policies
                                     </button>
                                 </div>
                             </div>
@@ -97,144 +202,9 @@
                         <div class="spinner-border text-primary" role="status">
                             <span class="visually-hidden">Loading...</span>
                         </div>
-                        <p class="mt-3 mb-0">Processing your BPMN model...</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Results Section -->
-        <div id="resultsSection" style="display: none;">
-            <!-- Process Overview -->
-            <div class="row mb-4">
-                <div class="col-12">
-                    <div class="card shadow-sm">
-                        <div class="card-header bg-success text-white">
-                            <h5 class="card-title mb-0">
-                                <i class="fas fa-check-circle me-2"></i>
-                                Processing Complete
-                            </h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <h6>Process Information</h6>
-                                    <ul class="list-unstyled">
-                                        <li><strong>File:</strong> <span id="processFile"></span></li>
-                                        <li><strong>Process Name:</strong> <span id="processName"></span></li>
-                                        <li><strong>Approach:</strong> <span id="processApproach"></span></li>
-                                        <li><strong>Fragmentation:</strong> <span id="processFragmentation"></span></li>
-                                    </ul>
-                                </div>
-                                <div class="col-md-6">
-                                    <h6>Model Statistics</h6>
-                                    <ul class="list-unstyled">
-                                        <li><strong>Activities:</strong> <span id="modelActivities"></span></li>
-                                        <li><strong>Gateways:</strong> <span id="modelGateways"></span></li>
-                                        <li><strong>Events:</strong> <span id="modelEvents"></span></li>
-                                    </ul>
-                                </div>
-                            </div>
-                            <div class="row mt-3">
-                                <div class="col-12">
-                                    <button id="downloadBtn" class="btn btn-outline-primary">
-                                        <i class="fas fa-download me-2"></i>
-                                        Download Results
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Metrics Section -->
-            <div class="row mb-4">
-                <div class="col-12">
-                    <div class="card shadow-sm">
-                        <div class="card-header bg-info text-white">
-                            <h5 class="card-title mb-0">
-                                <i class="fas fa-chart-bar me-2"></i>
-                                Policy Metrics
-                            </h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="row text-center">
-                                <div class="col-md-2">
-                                    <div class="metric-card">
-                                        <h3 class="text-primary" id="totalFragments">0</h3>
-                                        <p class="mb-0">Fragments</p>
-                                    </div>
-                                </div>
-                                <div class="col-md-2">
-                                    <div class="metric-card">
-                                        <h3 class="text-success" id="totalRules">0</h3>
-                                        <p class="mb-0">Total Rules</p>
-                                    </div>
-                                </div>
-                                <div class="col-md-2">
-                                    <div class="metric-card">
-                                        <h3 class="text-info" id="totalPermissions">0</h3>
-                                        <p class="mb-0">Permissions</p>
-                                    </div>
-                                </div>
-                                <div class="col-md-2">
-                                    <div class="metric-card">
-                                        <h3 class="text-warning" id="totalProhibitions">0</h3>
-                                        <p class="mb-0">Prohibitions</p>
-                                    </div>
-                                </div>
-                                <div class="col-md-2">
-                                    <div class="metric-card">
-                                        <h3 class="text-secondary" id="totalObligations">0</h3>
-                                        <p class="mb-0">Obligations</p>
-                                    </div>
-                                </div>
-                                <div class="col-md-2">
-                                    <div class="metric-card">
-                                        <h3 class="text-danger" id="totalConflicts">0</h3>
-                                        <p class="mb-0">Conflicts</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Fragments Section -->
-            <div class="row mb-4">
-                <div class="col-12">
-                    <div class="card shadow-sm">
-                        <div class="card-header bg-primary text-white">
-                            <h5 class="card-title mb-0">
-                                <i class="fas fa-puzzle-piece me-2"></i>
-                                Generated Fragments
-                            </h5>
-                        </div>
-                        <div class="card-body">
-                            <div id="fragmentsContainer">
-                                <!-- Fragments will be populated here -->
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Policies Section -->
-            <div class="row mb-4">
-                <div class="col-12">
-                    <div class="card shadow-sm">
-                        <div class="card-header bg-secondary text-white">
-                            <h5 class="card-title mb-0">
-                                <i class="fas fa-shield-alt me-2"></i>
-                                Generated Policies
-                            </h5>
-                        </div>
-                        <div class="card-body">
-                            <div id="policiesContainer">
-                                <!-- Policies will be populated here -->
-                            </div>
+                        <p class="mt-3 mb-0">Processing your BPMN model and generating policies...</p>
+                        <div class="progress mt-3" style="height: 20px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
                         </div>
                     </div>
                 </div>
@@ -245,26 +215,138 @@
         <div id="errorSection" class="row mb-4" style="display: none;">
             <div class="col-12">
                 <div class="alert alert-danger" role="alert">
-                    <h4 class="alert-heading">
-                        <i class="fas fa-exclamation-triangle me-2"></i>
-                        Error
-                    </h4>
+                    <h4 class="alert-heading">Error</h4>
                     <p id="errorMessage"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="resultsSection" class="row" style="display: none;">
+            <!-- Process Overview -->
+            <div class="col-12 mb-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-check-circle me-2"></i>
+                            Processing Complete
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h3 class="text-primary" id="processActivities">0</h3>
+                                    <p class="mb-0">Activities</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h3 class="text-info" id="processFragments">0</h3>
+                                    <p class="mb-0">Fragments</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h3 class="text-warning" id="processPolicies">0</h3>
+                                    <p class="mb-0">Policies</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <button id="downloadBtn" class="btn btn-success">
+                                        <i class="fas fa-download me-2"></i>
+                                        Download Results
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BP-Level Policy Section -->
+            <div id="bpPolicySection" class="col-12 mb-4" style="display: none;">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-shield-alt me-2"></i>
+                            Business Process Level Policy
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="bpPolicyContent"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Policy Metrics -->
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-chart-bar me-2"></i>
+                            Policy Metrics
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="metricsContent"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Consistency Results -->
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-balance-scale me-2"></i>
+                            Consistency Check
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="consistencyContent"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fragments and Policies -->
+            <div class="col-12 mb-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-puzzle-piece me-2"></i>
+                            Fragments and Generated Policies
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="fragmentsContent"></div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <footer class="bg-light mt-5 py-4">
-        <div class="container text-center">
-            <p class="mb-0 text-muted">
-                BPFragmentODRL Demo Tool - Fragment-level Policy Generation for Business Processes
-            </p>
-        </div>
-    </footer>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script>
+        // Handle BP policy source selection
+        document.querySelectorAll('input[name="bp_policy_source"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                const uploadSection = document.getElementById('bp_policy_upload_section');
+                const generateSection = document.getElementById('bp_policy_generate_section');
+                
+                uploadSection.style.display = 'none';
+                generateSection.style.display = 'none';
+                
+                if (this.value === 'upload') {
+                    uploadSection.style.display = 'block';
+                } else if (this.value === 'generate') {
+                    generateSection.style.display = 'block';
+                }
+            });
+        });
+    </script>
 </body>
 </html>
 

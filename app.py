@@ -3,6 +3,7 @@ Flask web application for BPFragmentODRL demo tool.
 
 This application provides a web interface for users to:
 - Upload BPMN models
+- Upload or generate BP-level policies
 - Select policy generation approach (template or LLM)
 - View generated fragments and policies
 - See policy metrics and analytics
@@ -22,6 +23,7 @@ from flask_cors import CORS
 # Add parent directory to path to import BPFragmentODRL modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.bp_fragment_odrl import BPFragmentODRL
+from src.bp_policy_generator import BPPolicyGenerator
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -40,7 +42,7 @@ CORS(app)
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Allowed file extensions
-ALLOWED_EXTENSIONS = {'bpmn', 'xml'}
+ALLOWED_EXTENSIONS = {'bpmn', 'xml', 'json', 'odrl'}
 
 def allowed_file(filename):
     """Check if file extension is allowed."""
@@ -55,55 +57,103 @@ def index():
 def upload_file():
     """Handle BPMN file upload and processing."""
     try:
-        # Check if file was uploaded
+        # Check if BPMN file was uploaded
         if 'bpmn_file' not in request.files:
-            return jsonify({'error': 'No file uploaded'}), 400
+            return jsonify({'error': 'No BPMN file uploaded'}), 400
         
-        file = request.files['bpmn_file']
-        if file.filename == '':
-            return jsonify({'error': 'No file selected'}), 400
+        bpmn_file = request.files['bpmn_file']
+        if bpmn_file.filename == '':
+            return jsonify({'error': 'No BPMN file selected'}), 400
         
-        if not allowed_file(file.filename):
-            return jsonify({'error': 'Invalid file type. Please upload a BPMN (.bpmn) or XML (.xml) file'}), 400
+        if not allowed_file(bpmn_file.filename):
+            return jsonify({'error': 'Invalid BPMN file type. Please upload a BPMN (.bpmn) or XML (.xml) file'}), 400
         
         # Get form parameters
         approach = request.form.get('approach', 'template')
         fragmentation_strategy = request.form.get('fragmentation_strategy', 'activity')
+        bp_policy_source = request.form.get('bp_policy_source', 'none')
+        bp_policy_template = request.form.get('bp_policy_template', 'standard')
         
-        # Save uploaded file
-        filename = secure_filename(file.filename)
+        # Advanced options
+        enable_consistency_check = request.form.get('enable_consistency_check') == 'on'
+        generate_metrics = request.form.get('generate_metrics') == 'on'
+        export_odrl = request.form.get('export_odrl') == 'on'
+        
+        # Save uploaded BPMN file
+        filename = secure_filename(bpmn_file.filename)
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f"{timestamp}_{filename}"
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(file_path)
+        bpmn_file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        bpmn_file.save(bpmn_file_path)
+        
+        # Handle BP-level policy
+        bp_policy = None
+        bp_policy_info = {'source': bp_policy_source}
+        
+        if bp_policy_source == 'upload':
+            # Handle BP policy file upload
+            if 'bp_policy_file' in request.files:
+                bp_policy_file = request.files['bp_policy_file']
+                if bp_policy_file.filename != '' and allowed_file(bp_policy_file.filename):
+                    bp_policy_filename = secure_filename(bp_policy_file.filename)
+                    bp_policy_filename = f"{timestamp}_bp_policy_{bp_policy_filename}"
+                    bp_policy_file_path = os.path.join(app.config['UPLOAD_FOLDER'], bp_policy_filename)
+                    bp_policy_file.save(bp_policy_file_path)
+                    
+                    # Load BP policy from file
+                    try:
+                        with open(bp_policy_file_path, 'r') as f:
+                            bp_policy = json.load(f)
+                        bp_policy_info['file'] = bp_policy_filename
+                        bp_policy_info['loaded'] = True
+                    except Exception as e:
+                        logger.warning(f"Failed to load BP policy file: {str(e)}")
+                        bp_policy_info['error'] = f"Failed to load BP policy: {str(e)}"
+        
+        elif bp_policy_source == 'generate':
+            # Generate BP-level policy
+            try:
+                bp_policy_generator = BPPolicyGenerator()
+                bp_policy = bp_policy_generator.generate_bp_policy(template=bp_policy_template)
+                bp_policy_info['template'] = bp_policy_template
+                bp_policy_info['generated'] = True
+            except Exception as e:
+                logger.warning(f"Failed to generate BP policy: {str(e)}")
+                bp_policy_info['error'] = f"Failed to generate BP policy: {str(e)}"
         
         # Process the BPMN file
         tool = BPFragmentODRL()
         
         # Load BPMN file
-        if not tool.load_bpmn_file(file_path):
+        if not tool.load_bpmn_file(bpmn_file_path):
             return jsonify({'error': 'Failed to load BPMN file. Please check if it is a valid BPMN file.'}), 400
         
         # Fragment process
         if not tool.fragment_process(fragmentation_strategy):
             return jsonify({'error': 'Failed to fragment the process.'}), 500
         
-        # Generate policies
-        if not tool.generate_policies(approach):
+        # Generate policies with BP-level policy
+        if not tool.generate_policies(approach, bp_policy):
             return jsonify({'error': 'Failed to generate policies.'}), 500
         
-        # Check policy consistency
-        tool.check_policy_consistency()
+        # Check policy consistency (if enabled)
+        consistency_results = None
+        if enable_consistency_check:
+            consistency_results = tool.check_policy_consistency()
         
-        # Get metrics
-        metrics = tool.get_policy_metrics()
+        # Get metrics (if enabled)
+        metrics = None
+        if generate_metrics:
+            metrics = tool.get_policy_metrics()
         
         # Prepare response data
         response_data = {
             'success': True,
-            'filename': file.filename,
+            'filename': bpmn_file.filename,
             'approach': approach,
             'fragmentation_strategy': fragmentation_strategy,
+            'bp_policy_info': bp_policy_info,
+            'bp_policy': bp_policy,
             'bp_model': {
                 'id': tool.bp_model.get('id', 'Unknown'),
                 'name': tool.bp_model.get('name', 'Unnamed Process'),
@@ -114,14 +164,19 @@ def upload_file():
             'fragments': tool.fragments,
             'fragment_activity_policies': tool.fragment_activity_policies,
             'fragment_dependency_policies': tool.fragment_dependency_policies,
-            'consistency_results': tool.consistency_results,
+            'consistency_results': consistency_results,
             'metrics': metrics,
-            'processing_timestamp': timestamp
+            'processing_timestamp': timestamp,
+            'options': {
+                'consistency_check': enable_consistency_check,
+                'generate_metrics': generate_metrics,
+                'export_odrl': export_odrl
+            }
         }
         
         # Save results for download
         results_dir = os.path.join(app.config['UPLOAD_FOLDER'], f'results_{timestamp}')
-        tool.save_results(results_dir)
+        tool.save_results(results_dir, include_bp_policy=bp_policy, export_odrl=export_odrl)
         response_data['results_dir'] = f'results_{timestamp}'
         
         return jsonify(response_data)
@@ -154,37 +209,42 @@ def download_results(results_dir):
             return send_file(
                 tmp_file.name,
                 as_attachment=True,
-                download_name=f'bpfragmentodrl_results_{results_dir}.zip',
+                download_name=f'{results_dir}.zip',
                 mimetype='application/zip'
             )
-    
+            
     except Exception as e:
         logger.error(f"Error creating download: {str(e)}")
-        return jsonify({'error': 'Failed to create download'}), 500
+        return jsonify({'error': f'An error occurred while creating the download: {str(e)}'}), 500
 
 @app.route('/api/approaches')
 def get_approaches():
-    """Get available policy generation approaches."""
+    """Get available policy generation approaches and fragmentation strategies."""
     return jsonify({
-        'approaches': [
-            {'value': 'template', 'label': 'Template-based', 'description': 'Rule-based policy generation using predefined templates'},
-            {'value': 'llm', 'label': 'LLM-based', 'description': 'AI-powered policy generation using Large Language Models'}
-        ],
-        'fragmentation_strategies': [
-            {'value': 'activity', 'label': 'Activity-based', 'description': 'Fragment based on individual activities'},
-            {'value': 'gateway', 'label': 'Gateway-based', 'description': 'Fragment based on gateway structures'},
-            {'value': 'hybrid', 'label': 'Hybrid', 'description': 'Combination of activity and gateway-based fragmentation'}
+        'approaches': ['template', 'llm'],
+        'fragmentation_strategies': ['activity', 'gateway', 'hybrid'],
+        'bp_policy_templates': [
+            'standard',
+            'financial', 
+            'healthcare',
+            'manufacturing',
+            'custom'
         ]
     })
 
 @app.route('/health')
 def health_check():
     """Health check endpoint."""
-    return jsonify({'status': 'healthy', 'timestamp': datetime.now().isoformat()})
+    return jsonify({
+        'status': 'healthy',
+        'timestamp': datetime.now().isoformat(),
+        'version': '1.0.0'
+    })
 
 if __name__ == '__main__':
     # Get port from environment variable or default to 5000
     port = int(os.environ.get('PORT', 5000))
+    
     # Run the Flask app
     app.run(host='0.0.0.0', port=port, debug=False)
 

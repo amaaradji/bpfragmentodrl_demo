@@ -188,7 +188,7 @@ class EnhancedPolicyGeneratorLLM:
     
     def _prepare_prompt(self, fragment_id, fragment):
         """
-        Prepare prompt for LLM policy generation.
+        Prepare prompt for LLM policy generation including BP-level policy context.
         
         Args:
             fragment_id (str): Fragment ID
@@ -204,19 +204,37 @@ class EnhancedPolicyGeneratorLLM:
 Generate ODRL policies for business process fragment {fragment_id} containing the following activities:
 {', '.join(activity_names)}
 
+"""
+        
+        # Add BP-level policy context if available
+        if self.bp_policy:
+            prompt += f"""
+BP-Level Policy Context:
+The fragment-level policies must be consistent with the following business process level policy:
+{json.dumps(self.bp_policy, indent=2)}
+
+Requirements:
+1. Fragment policies must inherit relevant constraints from BP-level policies
+2. No fragment policy should contradict BP-level prohibitions
+3. Fragment policies should support BP-level obligations where applicable
+4. Role assignments must be consistent with BP-level permissions
+
+"""
+        
+        prompt += """
 For each activity, generate appropriate permissions, prohibitions, and obligations.
 Consider typical business roles: Manager, Supervisor, Clerk, Customer.
 
 Return the policies in JSON format with the following structure:
 [
-  {{
+  {
     "target_activity_id": "activity_id",
     "rule_type": "permission|prohibition|obligation",
     "action": "execute|read|write|log",
     "assigner": "SystemPolicy",
     "assignee": "role_name",
     "constraints": []
-  }}
+  }
 ]
 
 Focus on realistic business constraints and role-based access control.

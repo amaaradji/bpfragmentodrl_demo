@@ -51,7 +51,7 @@ class EnhancedPolicyGenerator:
     
     def _generate_activity_policies(self):
         """
-        Generate activity policies for fragments.
+        Generate activity policies for fragments, considering BP-level policy.
         
         Returns:
             dict: Fragment activity policies
@@ -69,7 +69,7 @@ class EnhancedPolicyGenerator:
                 activity_id = activity.get('id')
                 activity_name = activity.get('name', '').lower()
                 
-                # Generate policies based on activity name semantics
+                # Generate base policies based on activity name semantics
                 if 'approve' in activity_name or 'review' in activity_name:
                     # Approval activities
                     fragment_policies.extend(self._generate_approval_policies(activity_id))
@@ -82,6 +82,10 @@ class EnhancedPolicyGenerator:
                 else:
                     # Default activities
                     fragment_policies.extend(self._generate_default_policies(activity_id))
+                
+                # Apply BP-level policy constraints if available
+                if self.bp_policy:
+                    fragment_policies = self._apply_bp_policy_constraints(fragment_policies, activity_id)
             
             fragment_activity_policies[fragment_id] = fragment_policies
         
@@ -329,3 +333,86 @@ class EnhancedPolicyGenerator:
                 ]
             }
         ]
+
+    def _apply_bp_policy_constraints(self, fragment_policies, activity_id):
+        """
+        Apply BP-level policy constraints to fragment policies.
+        
+        Args:
+            fragment_policies (list): Current fragment policies
+            activity_id (str): Activity ID
+            
+        Returns:
+            list: Updated fragment policies with BP constraints
+        """
+        if not self.bp_policy:
+            return fragment_policies
+        
+        try:
+            # Extract constraints from BP-level policy
+            bp_permissions = self.bp_policy.get('permission', [])
+            bp_prohibitions = self.bp_policy.get('prohibition', [])
+            bp_obligations = self.bp_policy.get('obligation', [])
+            
+            # Apply BP-level permissions as additional constraints
+            for bp_permission in bp_permissions:
+                if 'constraint' in bp_permission:
+                    for policy in fragment_policies:
+                        if policy.get('rule_type') == 'permission':
+                            # Add BP constraints to fragment permissions
+                            if 'constraints' not in policy:
+                                policy['constraints'] = []
+                            
+                            for bp_constraint in bp_permission['constraint']:
+                                policy['constraints'].append({
+                                    "constraint_type": "bp_policy",
+                                    "operator": bp_constraint.get('operator', 'eq'),
+                                    "value": bp_constraint.get('rightOperand', 'unknown'),
+                                    "source": "bp_level_policy"
+                                })
+            
+            # Apply BP-level prohibitions
+            for bp_prohibition in bp_prohibitions:
+                # Add prohibition policies derived from BP level
+                fragment_policies.append({
+                    "target_activity_id": activity_id,
+                    "rule_type": "prohibition",
+                    "action": bp_prohibition.get('action', 'execute'),
+                    "assigner": "BPLevelPolicy",
+                    "assignee": bp_prohibition.get('assignee', 'role:any'),
+                    "constraints": [
+                        {
+                            "constraint_type": "bp_policy_prohibition",
+                            "operator": "inherited",
+                            "value": "bp_level_constraint",
+                            "source": "bp_level_policy"
+                        }
+                    ]
+                })
+            
+            # Apply BP-level obligations
+            for bp_obligation in bp_obligations:
+                # Add obligation policies derived from BP level
+                fragment_policies.append({
+                    "target_activity_id": activity_id,
+                    "rule_type": "obligation",
+                    "action": bp_obligation.get('action', 'log'),
+                    "assigner": "BPLevelPolicy",
+                    "assignee": bp_obligation.get('assignee', 'system:audit'),
+                    "constraints": [
+                        {
+                            "constraint_type": "bp_policy_obligation",
+                            "operator": "inherited",
+                            "value": "bp_level_requirement",
+                            "source": "bp_level_policy"
+                        }
+                    ]
+                })
+            
+            logger.info(f"Applied BP-level policy constraints to activity {activity_id}")
+            
+        except Exception as e:
+            logger.warning(f"Error applying BP policy constraints: {str(e)}")
+        
+        return fragment_policies
+
