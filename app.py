@@ -69,7 +69,7 @@ def upload_file():
             return jsonify({'error': 'Invalid BPMN file type. Please upload a BPMN (.bpmn) or XML (.xml) file'}), 400
         
         # Get form parameters
-        approach = request.form.get('approach', 'template')
+        technique = request.form.get('approach', 'template')  # Keep 'approach' for form compatibility
         fragmentation_strategy = request.form.get('fragmentation_strategy', 'activity')
         bp_policy_source = request.form.get('bp_policy_source', 'none')
         bp_policy_template = request.form.get('bp_policy_template', 'standard')
@@ -133,7 +133,7 @@ def upload_file():
             return jsonify({'error': 'Failed to fragment the process.'}), 500
         
         # Generate policies with BP-level policy
-        if not tool.generate_policies(approach, bp_policy):
+        if not tool.generate_policies(technique, bp_policy):
             return jsonify({'error': 'Failed to generate policies.'}), 500
         
         # Check policy consistency (if enabled)
@@ -150,7 +150,8 @@ def upload_file():
         response_data = {
             'success': True,
             'filename': bpmn_file.filename,
-            'approach': approach,
+            'technique': technique,
+            'technique_used': 'LLM-based' if technique == 'llm' else 'Template-based',
             'fragmentation_strategy': fragmentation_strategy,
             'bp_policy_info': bp_policy_info,
             'bp_policy': bp_policy,
@@ -176,7 +177,7 @@ def upload_file():
         
         # Save results for download
         results_dir = os.path.join(app.config['UPLOAD_FOLDER'], f'results_{timestamp}')
-        tool.save_results(results_dir, include_bp_policy=bp_policy, export_odrl=export_odrl)
+        tool.save_results(results_dir)
         response_data['results_dir'] = f'results_{timestamp}'
         
         return jsonify(response_data)

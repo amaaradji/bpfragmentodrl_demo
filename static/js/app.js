@@ -1,255 +1,241 @@
 // JavaScript for BPFragmentODRL Demo Tool
 
 document.addEventListener('DOMContentLoaded', function() {
-    const uploadForm = document.getElementById('uploadForm');
-    const loadingSection = document.getElementById('loadingSection');
-    const resultsSection = document.getElementById('resultsSection');
-    const errorSection = document.getElementById('errorSection');
-    const downloadBtn = document.getElementById('downloadBtn');
+    // Handle BP policy source radio buttons
+    const bpPolicyRadios = document.querySelectorAll('input[name="bp_policy_source"]');
+    const bpTemplateSection = document.getElementById('bp_template_section');
+    const bpUploadSection = document.getElementById('bp_upload_section');
     
-    let currentResultsDir = null;
+    bpPolicyRadios.forEach(radio => {
+        radio.addEventListener('change', function() {
+            if (this.value === 'generate') {
+                bpTemplateSection.style.display = 'block';
+                bpUploadSection.style.display = 'none';
+            } else if (this.value === 'upload') {
+                bpTemplateSection.style.display = 'none';
+                bpUploadSection.style.display = 'block';
+            } else {
+                bpTemplateSection.style.display = 'none';
+                bpUploadSection.style.display = 'none';
+            }
+        });
+    });
 
     // Handle form submission
-    uploadForm.addEventListener('submit', function(e) {
+    const form = document.getElementById('bpmnForm');
+    form.addEventListener('submit', function(e) {
         e.preventDefault();
         
-        const formData = new FormData(uploadForm);
+        const formData = new FormData(form);
+        const technique = formData.get('approach');
         
-        // Show loading, hide other sections
-        showLoading();
-        hideResults();
-        hideError();
+        // Show loading section with technique indicator
+        document.getElementById('loadingSection').style.display = 'block';
+        document.getElementById('resultsSection').style.display = 'none';
+        document.getElementById('errorSection').style.display = 'none';
         
-        // Submit form data
+        // Update technique indicator
+        const techniqueDisplay = technique === 'llm' ? 'LLM-based' : 'Template-based';
+        document.getElementById('currentTechnique').textContent = techniqueDisplay;
+        
+        // Scroll to loading section
+        document.getElementById('loadingSection').scrollIntoView({ behavior: 'smooth' });
+        
+        // Submit form
         fetch('/upload', {
             method: 'POST',
             body: formData
         })
         .then(response => response.json())
         .then(data => {
-            hideLoading();
+            document.getElementById('loadingSection').style.display = 'none';
             
             if (data.success) {
                 displayResults(data);
-                showResults();
             } else {
-                showError(data.error || 'An unknown error occurred');
+                displayError(data.error || 'An unknown error occurred');
             }
         })
         .catch(error => {
-            hideLoading();
-            showError('Network error: ' + error.message);
+            document.getElementById('loadingSection').style.display = 'none';
+            displayError('Network error: ' + error.message);
         });
     });
+});
 
-    // Handle download button
-    downloadBtn.addEventListener('click', function() {
-        if (currentResultsDir) {
-            window.location.href = `/download/${currentResultsDir}`;
-        }
-    });
-
-    function showLoading() {
-        loadingSection.style.display = 'block';
-        loadingSection.classList.add('fade-in');
-    }
-
-    function hideLoading() {
-        loadingSection.style.display = 'none';
-        loadingSection.classList.remove('fade-in');
-    }
-
-    function showResults() {
-        resultsSection.style.display = 'block';
-        resultsSection.classList.add('fade-in');
-    }
-
-    function hideResults() {
-        resultsSection.style.display = 'none';
-        resultsSection.classList.remove('fade-in');
-    }
-
-    function showError(message) {
-        document.getElementById('errorMessage').textContent = message;
-        errorSection.style.display = 'block';
-        errorSection.classList.add('fade-in');
-    }
-
-    function hideError() {
-        errorSection.style.display = 'none';
-        errorSection.classList.remove('fade-in');
-    }
-
-    function displayResults(data) {
-        currentResultsDir = data.results_dir;
-        
-        // Update process information
-        document.getElementById('processFile').textContent = data.filename;
-        document.getElementById('processName').textContent = data.bp_model.name;
-        document.getElementById('processApproach').textContent = capitalizeFirst(data.approach);
-        document.getElementById('processFragmentation').textContent = capitalizeFirst(data.fragmentation_strategy) + '-based';
-        
-        // Update model statistics
-        document.getElementById('modelActivities').textContent = data.bp_model.activities;
-        document.getElementById('modelGateways').textContent = data.bp_model.gateways;
-        document.getElementById('modelEvents').textContent = data.bp_model.events;
-        
-        // Update metrics
-        const metrics = data.metrics;
-        document.getElementById('totalFragments').textContent = metrics.total_fragments || 0;
-        document.getElementById('totalRules').textContent = metrics.total_rules || 0;
-        document.getElementById('totalPermissions').textContent = metrics.permissions || 0;
-        document.getElementById('totalProhibitions').textContent = metrics.prohibitions || 0;
-        document.getElementById('totalObligations').textContent = metrics.obligations || 0;
-        document.getElementById('totalConflicts').textContent = metrics.conflicts || 0;
-        
-        // Display fragments
-        displayFragments(data.fragments);
-        
-        // Display policies
-        displayPolicies(data.fragment_activity_policies);
-    }
-
-    function displayFragments(fragments) {
-        const container = document.getElementById('fragmentsContainer');
-        container.innerHTML = '';
-        
-        if (!fragments || fragments.length === 0) {
-            container.innerHTML = '<p class="text-muted">No fragments generated.</p>';
-            return;
-        }
-        
-        fragments.forEach(fragment => {
-            const fragmentCard = document.createElement('div');
-            fragmentCard.className = 'fragment-card';
-            
-            const activities = fragment.activities || [];
-            const activitiesHtml = activities.map(activity => 
-                `<div class="activity-item">
-                    <strong>${activity.id}</strong>: ${activity.name || 'Unnamed Activity'}
-                    <span class="badge bg-secondary ms-2">${activity.type || 'task'}</span>
-                </div>`
-            ).join('');
-            
-            fragmentCard.innerHTML = `
-                <div class="fragment-header">
-                    <i class="fas fa-puzzle-piece me-2"></i>
-                    Fragment ${fragment.id}
+function displayResults(data) {
+    const resultsSection = document.getElementById('resultsSection');
+    
+    // Determine if LLM was successfully used
+    const llmSuccess = data.technique === 'llm' && data.technique_used === 'LLM-based';
+    const llmIndicator = llmSuccess ? 
+        '<span class="badge bg-success ms-2"><i class="fas fa-robot me-1"></i>LLM Success</span>' : 
+        (data.technique === 'llm' ? '<span class="badge bg-warning ms-2"><i class="fas fa-exclamation-triangle me-1"></i>LLM Fallback to Template</span>' : '');
+    
+    resultsSection.innerHTML = `
+        <div class="col-12">
+            <div class="card border-success shadow-lg">
+                <div class="card-header bg-success text-white">
+                    <h3 class="card-title mb-0">
+                        <i class="fas fa-check-circle me-2"></i>Policy Generation Results
+                        ${llmIndicator}
+                    </h3>
                 </div>
-                <div class="fragment-activities">
-                    <h6>Activities (${activities.length}):</h6>
-                    ${activitiesHtml || '<p class="text-muted">No activities in this fragment.</p>'}
-                </div>
-            `;
-            
-            container.appendChild(fragmentCard);
-        });
-    }
-
-    function displayPolicies(fragmentPolicies) {
-        const container = document.getElementById('policiesContainer');
-        container.innerHTML = '';
-        
-        if (!fragmentPolicies || Object.keys(fragmentPolicies).length === 0) {
-            container.innerHTML = '<p class="text-muted">No policies generated.</p>';
-            return;
-        }
-        
-        Object.entries(fragmentPolicies).forEach(([fragmentId, policies]) => {
-            const policyCard = document.createElement('div');
-            policyCard.className = 'policy-card';
-            
-            const policiesHtml = policies.map(policy => {
-                const policyClass = `policy-${policy.rule_type}`;
-                const iconClass = getPolicyIcon(policy.rule_type);
-                
-                return `
-                    <div class="policy-item ${policyClass}">
-                        <div class="policy-type">
-                            <i class="${iconClass} me-1"></i>
-                            ${policy.rule_type}
+                <div class="card-body">
+                    <!-- Process Overview -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h5 class="card-title"><i class="fas fa-info-circle text-primary me-2"></i>Process Overview</h5>
+                                    <ul class="list-unstyled mb-0">
+                                        <li><strong>File:</strong> ${data.filename}</li>
+                                        <li><strong>Technique:</strong> ${data.technique_used}</li>
+                                        <li><strong>Fragmentation:</strong> ${data.fragmentation_strategy}</li>
+                                        <li><strong>Process:</strong> ${data.bp_model.name}</li>
+                                        <li><strong>Activities:</strong> ${data.bp_model.activities}</li>
+                                        <li><strong>Fragments:</strong> ${data.fragments.length}</li>
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
-                        <div class="policy-details">
-                            <strong>Target:</strong> ${policy.target_activity_id}<br>
-                            <strong>Action:</strong> ${policy.action}<br>
-                            <strong>Assignee:</strong> ${policy.assignee}<br>
-                            ${policy.constraints && policy.constraints.length > 0 ? 
-                                `<strong>Constraints:</strong> ${formatConstraints(policy.constraints)}` : ''}
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h5 class="card-title"><i class="fas fa-chart-pie text-info me-2"></i>Policy Metrics</h5>
+                                    ${data.metrics ? `
+                                        <div class="row text-center">
+                                            <div class="col-4">
+                                                <div class="metric-card bg-success text-white rounded p-2">
+                                                    <div class="h4 mb-0">${data.metrics.total_permissions}</div>
+                                                    <small>Permissions</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-4">
+                                                <div class="metric-card bg-danger text-white rounded p-2">
+                                                    <div class="h4 mb-0">${data.metrics.total_prohibitions}</div>
+                                                    <small>Prohibitions</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-4">
+                                                <div class="metric-card bg-warning text-white rounded p-2">
+                                                    <div class="h4 mb-0">${data.metrics.total_obligations}</div>
+                                                    <small>Obligations</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="mt-2 text-center">
+                                            <small class="text-muted">Total Rules: ${data.metrics.total_rules}</small>
+                                        </div>
+                                    ` : '<p class="text-muted">Metrics not generated</p>'}
+                                </div>
+                            </div>
                         </div>
                     </div>
-                `;
-            }).join('');
-            
-            policyCard.innerHTML = `
-                <div class="policy-header">
-                    <i class="fas fa-shield-alt me-2"></i>
-                    Fragment ${fragmentId} Policies (${policies.length})
+
+                    <!-- BP Policy Information -->
+                    ${data.bp_policy_info ? `
+                        <div class="alert alert-info">
+                            <h6><i class="fas fa-heart me-2"></i>BP-Level Policy Applied</h6>
+                            <p class="mb-0">${data.bp_policy_info}</p>
+                        </div>
+                    ` : ''}
+
+                    <!-- Fragments and Policies -->
+                    <div class="accordion" id="fragmentsAccordion">
+                        ${data.fragments.map((fragment, index) => `
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="heading${index}">
+                                    <button class="accordion-button ${index === 0 ? '' : 'collapsed'}" type="button" 
+                                            data-bs-toggle="collapse" data-bs-target="#collapse${index}">
+                                        <i class="fas fa-puzzle-piece me-2"></i>
+                                        Fragment ${fragment.id} 
+                                        <span class="badge bg-primary ms-2">${fragment.activities.length} activities</span>
+                                        <span class="badge bg-secondary ms-1">${data.fragment_activity_policies[fragment.id] ? data.fragment_activity_policies[fragment.id].length : 0} policies</span>
+                                    </button>
+                                </h2>
+                                <div id="collapse${index}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" 
+                                     data-bs-parent="#fragmentsAccordion">
+                                    <div class="accordion-body">
+                                        <!-- Activities -->
+                                        <h6><i class="fas fa-tasks me-2"></i>Activities:</h6>
+                                        <div class="row mb-3">
+                                            ${fragment.activities.map(activity => `
+                                                <div class="col-md-4 mb-2">
+                                                    <span class="badge bg-light text-dark border">${activity.name || activity.id}</span>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                        
+                                        <!-- Policies -->
+                                        <h6><i class="fas fa-shield-alt me-2"></i>Generated Policies:</h6>
+                                        ${data.fragment_activity_policies[fragment.id] ? `
+                                            <div class="table-responsive">
+                                                <table class="table table-sm table-striped">
+                                                    <thead class="table-dark">
+                                                        <tr>
+                                                            <th>Type</th>
+                                                            <th>Action</th>
+                                                            <th>Assignee</th>
+                                                            <th>Activity</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        ${data.fragment_activity_policies[fragment.id].map(policy => `
+                                                            <tr>
+                                                                <td>
+                                                                    <span class="badge ${policy.rule_type === 'permission' ? 'bg-success' : 
+                                                                                       policy.rule_type === 'prohibition' ? 'bg-danger' : 'bg-warning'}">
+                                                                        ${policy.rule_type}
+                                                                    </span>
+                                                                </td>
+                                                                <td>${policy.action}</td>
+                                                                <td>${policy.assignee}</td>
+                                                                <td>${policy.target_activity_id}</td>
+                                                            </tr>
+                                                        `).join('')}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        ` : '<p class="text-muted">No policies generated for this fragment</p>'}
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+
+                    <!-- Consistency Results -->
+                    ${data.consistency_results ? `
+                        <div class="mt-4">
+                            <h5><i class="fas fa-check-double text-success me-2"></i>Policy Consistency Check</h5>
+                            <div class="alert ${data.consistency_results.conflicts && data.consistency_results.conflicts.length > 0 ? 'alert-warning' : 'alert-success'}">
+                                <strong>Conflicts Found:</strong> ${data.consistency_results.conflicts ? data.consistency_results.conflicts.length : 0}
+                                ${data.consistency_results.conflicts && data.consistency_results.conflicts.length > 0 ? 
+                                    '<ul class="mt-2">' + data.consistency_results.conflicts.map(conflict => `<li>${conflict}</li>`).join('') + '</ul>' : 
+                                    '<p class="mb-0">All policies are consistent!</p>'}
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    <!-- Download Section -->
+                    <div class="text-center mt-4">
+                        <a href="/download/${data.results_dir}" class="btn btn-success btn-lg">
+                            <i class="fas fa-download me-2"></i>Download Results (ZIP)
+                        </a>
+                    </div>
                 </div>
-                <div class="policies-list">
-                    ${policiesHtml}
-                </div>
-            `;
-            
-            container.appendChild(policyCard);
-        });
-    }
+            </div>
+        </div>
+    `;
+    
+    resultsSection.style.display = 'block';
+    resultsSection.scrollIntoView({ behavior: 'smooth' });
+}
 
-    function getPolicyIcon(ruleType) {
-        switch (ruleType) {
-            case 'permission':
-                return 'fas fa-check-circle';
-            case 'prohibition':
-                return 'fas fa-times-circle';
-            case 'obligation':
-                return 'fas fa-exclamation-circle';
-            default:
-                return 'fas fa-circle';
-        }
-    }
-
-    function formatConstraints(constraints) {
-        if (!constraints || constraints.length === 0) {
-            return 'None';
-        }
-        
-        return constraints.map(constraint => {
-            return `${constraint.constraint_type}: ${constraint.operator} ${constraint.value}`;
-        }).join(', ');
-    }
-
-    function capitalizeFirst(str) {
-        return str.charAt(0).toUpperCase() + str.slice(1);
-    }
-
-    // Load available approaches on page load
-    fetch('/api/approaches')
-        .then(response => response.json())
-        .then(data => {
-            // Update approach descriptions if needed
-            const approachSelect = document.getElementById('approach');
-            const fragmentationSelect = document.getElementById('fragmentation_strategy');
-            
-            // Add tooltips or help text based on the API response
-            if (data.approaches) {
-                data.approaches.forEach(approach => {
-                    const option = approachSelect.querySelector(`option[value="${approach.value}"]`);
-                    if (option) {
-                        option.title = approach.description;
-                    }
-                });
-            }
-            
-            if (data.fragmentation_strategies) {
-                data.fragmentation_strategies.forEach(strategy => {
-                    const option = fragmentationSelect.querySelector(`option[value="${strategy.value}"]`);
-                    if (option) {
-                        option.title = strategy.description;
-                    }
-                });
-            }
-        })
-        .catch(error => {
-            console.warn('Could not load approach descriptions:', error);
-        });
-});
+function displayError(errorMessage) {
+    const errorSection = document.getElementById('errorSection');
+    document.getElementById('errorMessage').textContent = errorMessage;
+    errorSection.style.display = 'block';
+    errorSection.scrollIntoView({ behavior: 'smooth' });
+}
 
