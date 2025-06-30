@@ -1,0 +1,43 @@
+<?xml version="1.0" ?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" targetNamespace="http://example.com/bpmn/credit_application">
+  <bpmn:process id="credit_application_process" isExecutable="true">
+    <bpmn:startEvent id="start_event_1" name="Online Credit Application Received"/>
+    <bpmn:task id="task_check_completeness" name="Verify Application Completeness"/>
+    <bpmn:sequenceFlow id="flow_start_to_check" sourceRef="start_event_1" targetRef="task_check_completeness"/>
+    <bpmn:exclusiveGateway id="gw_completeness" name="Application Complete?"/>
+    <bpmn:sequenceFlow id="flow_check_to_gw_completeness" sourceRef="task_check_completeness" targetRef="gw_completeness"/>
+    <bpmn:task id="task_ask_missing_docs" name="Ask for Missing Documents"/>
+    <bpmn:sequenceFlow id="flow_gw_completeness_to_ask_docs" sourceRef="gw_completeness" targetRef="task_ask_missing_docs" name="No"/>
+    <bpmn:sequenceFlow id="flow_ask_docs_to_check_completeness" sourceRef="task_ask_missing_docs" targetRef="task_check_completeness"/>
+    <bpmn:task id="task_perform_initial_checks" name="Perform Initial Checks"/>
+    <bpmn:sequenceFlow id="flow_gw_completeness_to_initial_checks" sourceRef="gw_completeness" targetRef="task_perform_initial_checks" name="Yes"/>
+    <bpmn:exclusiveGateway id="gw_credit_amount" name="Credit Amount?"/>
+    <bpmn:sequenceFlow id="flow_initial_checks_to_gw_amount" sourceRef="task_perform_initial_checks" targetRef="gw_credit_amount"/>
+    <bpmn:task id="task_check_small_amount" name="Perform Checks for Small Amount"/>
+    <bpmn:sequenceFlow id="flow_gw_amount_to_small_check" sourceRef="gw_credit_amount" targetRef="task_check_small_amount" name="&lt;= $500"/>
+    <bpmn:task id="task_check_large_amount" name="Perform Checks for Large Amount"/>
+    <bpmn:sequenceFlow id="flow_gw_amount_to_large_check" sourceRef="gw_credit_amount" targetRef="task_check_large_amount" name="&gt; $500"/>
+    <bpmn:exclusiveGateway id="gw_merge_checks" name="Merge Checks"/>
+    <bpmn:sequenceFlow id="flow_small_check_to_merge" sourceRef="task_check_small_amount" targetRef="gw_merge_checks"/>
+    <bpmn:sequenceFlow id="flow_large_check_to_merge" sourceRef="task_check_large_amount" targetRef="gw_merge_checks"/>
+    <bpmn:task id="task_send_to_manager" name="Send Application to Manager"/>
+    <bpmn:sequenceFlow id="flow_merge_to_send_manager" sourceRef="gw_merge_checks" targetRef="task_send_to_manager"/>
+    <bpmn:task id="task_manager_decision" name="Manager Makes Final Decision"/>
+    <bpmn:sequenceFlow id="flow_send_manager_to_decision" sourceRef="task_send_to_manager" targetRef="task_manager_decision"/>
+    <bpmn:exclusiveGateway id="gw_decision_outcome" name="Decision Outcome?"/>
+    <bpmn:sequenceFlow id="flow_decision_to_gw_outcome" sourceRef="task_manager_decision" targetRef="gw_decision_outcome"/>
+    <bpmn:task id="task_notify_acceptance" name="Notify Applicant of Acceptance"/>
+    <bpmn:sequenceFlow id="flow_gw_outcome_to_notify_acceptance" sourceRef="gw_decision_outcome" targetRef="task_notify_acceptance" name="Accepted"/>
+    <bpmn:task id="task_issue_card" name="Issue Credit Card Production Request"/>
+    <bpmn:sequenceFlow id="flow_notify_acceptance_to_issue_card" sourceRef="task_notify_acceptance" targetRef="task_issue_card"/>
+    <bpmn:endEvent id="end_event_accepted" name="Process Accepted and Card Issued"/>
+    <bpmn:sequenceFlow id="flow_issue_card_to_end_accepted" sourceRef="task_issue_card" targetRef="end_event_accepted"/>
+    <bpmn:task id="task_notify_rejection" name="Notify Applicant of Rejection"/>
+    <bpmn:sequenceFlow id="flow_gw_outcome_to_notify_rejection" sourceRef="gw_decision_outcome" targetRef="task_notify_rejection" name="Rejected"/>
+    <bpmn:endEvent id="end_event_rejected" name="Process Rejected"/>
+    <bpmn:sequenceFlow id="flow_notify_rejection_to_end_rejected" sourceRef="task_notify_rejection" targetRef="end_event_rejected"/>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="credit_application_process"/>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
